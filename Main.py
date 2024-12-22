@@ -1,8 +1,11 @@
 from tkinter import filedialog
 from scipy.signal import butter, filtfilt
 import numpy as np
+import pywt
 
 freq = 176
+waveletf='db2'
+levels=3
 
 def openFile():
     filepath = filedialog.askopenfilename(title="Select File", filetypes=(("text files", ".txt"), ("all files", ".*")))
@@ -83,7 +86,18 @@ def preProcessing():
     samples = resampling(samples)
     return samples
 
+def wavelet(samples):
+    new_samples=[]
+    for sample_list in samples:
+        temp=pywt.wavedec(sample_list,waveletf,mode='symmetric',level=levels)
+        n=temp[0]+temp[1]
+        new_samples.append(n)
+
+    return new_samples
+
+
 samples = preProcessing()
+samples=wavelet(samples)
 
 for sample_list in samples:
     print(sample_list)
