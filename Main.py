@@ -2,11 +2,8 @@ from tkinter import filedialog
 from scipy.signal import butter, filtfilt
 import numpy as np
 import pywt
-
-freq = 176
-waveletf='db2'
-levels=3
-
+from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
+from sklearn.neighbors import KNeighborsClassifier
 def openFile():
     filepath = filedialog.askopenfilename(title="Select File", filetypes=(("text files", ".txt"), ("all files", ".*")))
     if filepath:
@@ -31,11 +28,11 @@ def meanRemoval(samples):
         processed_samples.append(list(np.array(sample_list) - mean_value))
     return processed_samples
 
-def bandpass_filter(samples):
-    nyquist = 0.5 * freq
-    low = 0.5 / nyquist
-    high = 20 / nyquist
-    b, a = butter(5, [low, high], btype='bandpass')
+def bandpass_filter(samples, lowcut=0.5, highcut=20.0, fs=176, order=5):
+    nyquist = 0.5 * fs
+    low = lowcut / nyquist
+    high = highcut / nyquist
+    b, a = butter(order, [low, high], btype='bandpass')
 
     filtered_samples = []
     for sample_list in samples:
@@ -43,10 +40,10 @@ def bandpass_filter(samples):
         filtered_samples.append(list(filtered_signal))
     return filtered_samples
 
-def lowpass_filter(samples):
-    nyquist = 0.5 * freq
-    normalized_cutoff = 20 / nyquist
-    b, a = butter(5, normalized_cutoff, btype='lowpass')
+def lowpass_filter(samples, highcut=20.0, fs=176, order=5):
+    nyquist = 0.5 * fs
+    normalized_cutoff = highcut / nyquist
+    b, a = butter(order, normalized_cutoff, btype='lowpass')
 
     filtered_signal = filtfilt(b, a, samples)
 
@@ -86,19 +83,65 @@ def preProcessing():
     samples = resampling(samples)
     return samples
 
-def wavelet(samples):
-    new_samples=[]
+def wavelet(samples, wavelet = 'db2', level = 1):
+    new_samples = []
     for sample_list in samples:
-        temp=pywt.wavedec(sample_list,waveletf,mode='symmetric',level=levels)
-        n=temp[0]+temp[1]
-        new_samples.append(n)
+        DWT = pywt.wavedec(data=sample_list, wavelet=wavelet, mode='symmetric', level=level)
+        new_samples.append(np.concatenate(DWT))
+    return np.array(new_samples)
 
-    return new_samples
+def KNN(x_train, y_train, x_test, y_test):
+
+    model = KNeighborsClassifier(n_neighbors=10)
+
+    model.fit(x_train, y_train)
+
+    print("Train  : ")
+
+    y_predict = model.predict(x_train)
+
+    score = accuracy_score(y_train, y_predict)
+
+    cr = classification_report(y_train, y_predict)
+
+    cm = confusion_matrix(y_train, y_predict)
+
+    print("Accuracy : ", score, "\n")
+    print("Classification Report : \n", cr)
+    print("Confusion Matrix : \n", cm)
+
+    print("Test  : ")
+
+    y_predict = model.predict(x_test)
+
+    score = accuracy_score(y_test, y_predict)
+
+    cr = classification_report(y_test, y_predict)
+
+    cm = confusion_matrix(y_test, y_predict)
+
+    print("Accuracy : ", score, "\n")
+    print("Classification Report : \n", cr)
+    print("Confusion Matrix : \n", cm)
 
 
-samples = preProcessing()
-samples=wavelet(samples)
 
-for sample_list in samples:
-    print(sample_list)
-    print("\n\n")
+samples_uptrain = preProcessing()
+samples_uptrain = wavelet(samples_uptrain)
+
+samples_uptest = preProcessing()
+samples_uptest = wavelet(samples_uptest)
+
+samples_downtrain = preProcessing()
+samples_downtrain = wavelet(samples_downtrain)
+
+samples_downtest = preProcessing()
+samples_downtest = wavelet(samples_downtest)
+
+train_x = np.concatenate([samples_uptrain, samples_downtrain])
+test_x = np.concatenate([samples_uptest, samples_downtest])
+
+train_y = np.concatenate([np.array([1]*len(samples_uptrain)), np.array([0]*len(samples_downtrain))])
+test_y = np.concatenate([np.array([1]*len(samples_uptest)), np.array([0]*len(samples_downtest))])
+
+KNN(train_x, train_y, test_x, test_y)
