@@ -32,7 +32,7 @@ def bandpass_filter(samples):
     nyquist = 0.5 * freq
     low = 0.5 / nyquist
     high = 20 / nyquist
-    b, a = butter(2, [low, high], btype='bandpass')
+    b, a = butter(5, [low, high], btype='bandpass')
 
     filtered_samples = []
     for sample_list in samples:
@@ -43,13 +43,11 @@ def bandpass_filter(samples):
 def lowpass_filter(samples):
     nyquist = 0.5 * freq
     normalized_cutoff = 20 / nyquist
-    b, a = butter(2, normalized_cutoff, btype='low')
+    b, a = butter(5, normalized_cutoff, btype='lowpass')
 
-    filtered_samples = []
-    for sample_list in samples:
-        filtered_signal = filtfilt(b, a, sample_list)
-        filtered_samples.append(list(filtered_signal))
-    return filtered_samples
+    filtered_signal = filtfilt(b, a, samples)
+
+    return filtered_signal
 
 def normalize_signal(samples):
     normalized_samples = [] 
@@ -69,10 +67,11 @@ def resampling(samples):
     resampled_samples = []
     
     for sample_list in samples:
-        filtered_samples = lowpass_filter([sample_list])
-        
+
+        filtered_samples = lowpass_filter(sample_list)
+
         resampled_signal = filtered_samples[::m]
-        resampled_samples.append(list(resampled_signal))
+        resampled_samples.append(resampled_signal)
 
     return resampled_samples
 
@@ -81,10 +80,11 @@ def preProcessing():
     samples = meanRemoval(samples)
     samples = bandpass_filter(samples)
     samples = normalize_signal(samples)
-    samples = resampling(samples)  # Add resampling step
+    samples = resampling(samples)
     return samples
 
 samples = preProcessing()
+
 for sample_list in samples:
     print(sample_list)
     print("\n\n")
