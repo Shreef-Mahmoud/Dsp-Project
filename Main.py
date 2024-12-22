@@ -1,149 +1,90 @@
+from tkinter import filedialog
+from scipy.signal import butter, filtfilt
 import numpy as np
 
 freq = 176
 
-def meanRemoval(samples):
-    mean_value = np.mean(samples)
-    samples = (samples - mean_value)
+def openFile():
+    filepath = filedialog.askopenfilename(title="Select File", filetypes=(("text files", ".txt"), ("all files", ".*")))
+    if filepath:
+        samples = readfile(filepath)
+
     return samples
 
-# def bandPassFilter():
+def readfile(filepath):
+    samples = []
+    with open(filepath, 'r') as f:
+        for line in f:
+            values = [float(val) for val in line.strip().split('\t')]
+            samples.append(list(values))
 
-#     fs = freq
-#     stop_attenuation = float(simpledialog.askstring("Input", "Enter the stop band attenuation (δs):"))
-#     transition_band = float(simpledialog.askstring("Input", "Enter the transition band (Hz):"))
-
-#     f1 = 0.5
-#     f2 = 20
-
-#     delta_f_normalized = transition_band / fs
-
-    
-#     cutoff_1 = (f1 - (transition_band / 2)) / fs
-#     cutoff_2 = (f2 + (transition_band / 2)) / fs
-
-#     if stop_attenuation <= 21:
-#         constant = 0.9
-#         window_name = "Rectangular"
-#     elif stop_attenuation <= 44:
-#         constant = 3.1
-#         window_name = "Hanning"
-#     elif stop_attenuation <= 53:
-#         constant = 3.3
-#         window_name = "Hamming"
-#     else:
-#         constant = 5.5
-#         window_name = "Blackman"
-
-#     N = int(np.ceil(constant / delta_f_normalized))
-#     if N % 2 == 0:
-#         N += 1
-#     middle = N // 2
-
-#     h_d = np.zeros(N)
-#     for n in range(-middle, middle + 1):
-#         if n == 0:
-#             h_d[n + middle] = 2 * (cutoff_2 - cutoff_1)
-#         else:
-#             h_d[n + middle] = (np.sin(2 * np.pi * cutoff_2 * n) - np.sin(2 * np.pi * cutoff_1 * n)) / (np.pi * n)
-
-#     n = np.arange(-middle, middle + 1)
-#     if window_name == "Rectangular":
-#         window = 1
-#     elif window_name == "Hanning":
-#         window = 0.5 + 0.5 * np.cos(2 * np.pi * n / N)
-#     elif window_name == "Hamming":
-#         window = 0.54 + 0.46 * np.cos(2 * np.pi * n / N)
-#     elif window_name == "Blackman":
-#         window = 0.42 + 0.5 * np.cos(2 * np.pi * n / (N - 1)) + 0.08 * np.cos(4 * np.pi * n / (N - 1))
-
-#     h = h_d * window
+    return samples
 
 
+def meanRemoval(samples):
+    processed_samples = []
+    for sample_list in samples:
+        mean_value = np.mean(sample_list)
+        processed_samples.append(list(np.array(sample_list) - mean_value))
+    return processed_samples
 
-def normalize_signal(sample):
+def bandpass_filter(samples):
+    nyquist = 0.5 * freq
+    low = 0.5 / nyquist
+    high = 20 / nyquist
+    b, a = butter(2, [low, high], btype='bandpass')
 
-    min_val = np.min(sample)
-    max_val = np.max(sample)
+    filtered_samples = []
+    for sample_list in samples:
+        filtered_signal = filtfilt(b, a, sample_list)
+        filtered_samples.append(list(filtered_signal))
+    return filtered_samples
 
-    normalized_sample = 2 * (sample - min_val) / (max_val - min_val) - 1
+def lowpass_filter(samples):
+    nyquist = 0.5 * freq
+    normalized_cutoff = 20 / nyquist
+    b, a = butter(2, normalized_cutoff, btype='low')
 
-    return normalized_sample
+    filtered_samples = []
+    for sample_list in samples:
+        filtered_signal = filtfilt(b, a, sample_list)
+        filtered_samples.append(list(filtered_signal))
+    return filtered_samples
+
+def normalize_signal(samples):
+    normalized_samples = [] 
+
+    for sample_list in samples:
+        min_val = np.min(sample_list)
+        max_val = np.max(sample_list)
+
+        normalized_sample = 2 * (sample_list - min_val) / (max_val - min_val) - 1
+        normalized_samples.append(list(normalized_sample))
+
+    return normalized_samples
 
 
-# def lowPassFilter(index , sample ):
-
-#     fs = freq
-
-#     stop_attenuation = float(simpledialog.askstring("Input", "Enter the stop band attenuation (δs):"))
-#     transition_band = float(simpledialog.askstring("Input", "Enter the transition band (Hz):"))
-
-
-#     cutoff_freq = float(simpledialog.askstring("Input", "Enter the cutoff frequency (Hz):"))
-
-#     delta_f_normalized = transition_band / fs
-
-#     cutoff = (cutoff_freq + (transition_band / 2)) / fs
-
-#     if stop_attenuation <= 21:
-#         constant = 0.9
-#         window_name = "Rectangular"
-#     elif stop_attenuation <= 44:
-#         constant = 3.1
-#         window_name = "Hanning"
-#     elif stop_attenuation <= 53:
-#         constant = 3.3
-#         window_name = "Hamming"
-#     else:
-#         constant = 5.5
-#         window_name = "Blackman"
-
-#     N = int(np.ceil(constant / delta_f_normalized))
-#     if N % 2 == 0:
-#         N += 1
-#     middle = N // 2
-
-#     h_d = np.zeros(N)
-#     for n in range(-middle, middle + 1):
-#         if n == 0:
-#             h_d[n + middle] = 2 * cutoff
-#         else:
-#             h_d[n + middle] = np.sin(2 * np.pi * cutoff * n) / (np.pi * n)
-
-#     n = np.arange(-middle, middle + 1)
-#     if window_name == "Rectangular":
-#         window = 1
-#     elif window_name == "Hanning":
-#         window = 0.5 + 0.5 * np.cos(2 * np.pi * n / N)
-#     elif window_name == "Hamming":
-#         window = 0.54 + 0.46 * np.cos(2 * np.pi * n / N)
-#     elif window_name == "Blackman":
-#         window = 0.42 + 0.5 * np.cos(2 * np.pi * n / (N - 1)) + 0.08 * np.cos(4 * np.pi * n / (N - 1))
-
-#     h = h_d * window
-
-def resampling(indices, samples):
+def resampling(samples):
     m = 4
+    resampled_samples = []
+    
+    for sample_list in samples:
+        filtered_samples = lowpass_filter([sample_list])
+        
+        resampled_signal = filtered_samples[::m]
+        resampled_samples.append(list(resampled_signal))
 
-    # filtered_indices, filtered_samples = FIR(indices, samples)
+    return resampled_samples
 
-    filtered_samples = filtered_samples[::m]
-    filtered_indices = filtered_indices[::m]
-    index_temp = []
-    i = 0
-    x = filtered_indices[0]
-    while (True):
-        index_temp.append(x)
-        i += 1
-        x += 1
-        if i == len(filtered_indices):
-            break
+def preProcessing():
+    samples = openFile()
+    samples = meanRemoval(samples)
+    samples = bandpass_filter(samples)
+    samples = normalize_signal(samples)
+    samples = resampling(samples)  # Add resampling step
+    return samples
 
-
-        filtered_indices = index_temp
-
-    while filtered_samples and filtered_samples[-1] == 0:
-        filtered_samples.pop()    
-        filtered_indices.pop()
-
-    return filtered_samples , filtered_indices
+samples = preProcessing()
+for sample_list in samples:
+    print(sample_list)
+    print("\n\n")
