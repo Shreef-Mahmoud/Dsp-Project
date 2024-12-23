@@ -1,17 +1,18 @@
-from tkinter import filedialog
+import tkinter as tk
+from tkinter import filedialog, messagebox
 from scipy.signal import butter, filtfilt
 import numpy as np
 import pywt
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
-from sklearn.neighbors import KNeighborsClassifier
+from sklearn.metrics import accuracy_score, classification_report
 
-def openFile(filepath):
-    # filepath = filedialog.askopenfilename(title="Select File", filetypes=(("text files", ".txt"), ("all files", ".*")))
+def openFile():
+    filepath = filedialog.askopenfilename(title="Select File", filetypes=(("text files", "*.txt"), ("all files", "*.*")))
     if filepath:
         samples = readfile(filepath)
-
-    return samples
+        return samples, filepath
+    else:
+        return None, None
 
 def readfile(filepath):
     samples = []
@@ -51,13 +52,24 @@ def lowpass_filter(samples, highcut=20.0, fs=176, order=5):
 
     return filtered_signal
 
-def normalize_signal(samples):
+def normalize_signal(samples, range_type='-1 to 1'):
     normalized_samples = []
     for sample_list in samples:
         min_val = np.min(sample_list)
         max_val = np.max(sample_list)
-        normalized_sample = 2 * (np.array(sample_list) - min_val) / (max_val - min_val) - 1
-        normalized_samples.append(list(normalized_sample))
+        if range_type == '-1 to 1':
+
+            normalized_sample = 2 * (np.array(sample_list) - min_val) / (max_val - min_val) - 1
+            normalized_samples.append(list(normalized_sample))
+
+        elif range_type == '0 to 1':
+
+            normalized_sample = (np.array(sample_list) - min_val) / (max_val - min_val)
+            normalized_samples.append(list(normalized_sample))
+
+        else:
+            raise ValueError("range_type must be either '-1 to 1' or '0 to 1'.")
+
     return normalized_samples
 
 
@@ -71,7 +83,7 @@ def resampling(samples):
     return resampled_samples
 
 def preProcessing(filepath):
-    samples = openFile(filepath)
+    samples = readfile(filepath)
     samples = meanRemoval(samples)
     samples = bandpass_filter(samples)
     samples = normalize_signal(samples)
@@ -86,54 +98,89 @@ def wavelet(samples, wavelet = 'db2', level = 1):
         new_samples.append(np.concatenate(DWT))
     return np.array(new_samples)
 
-def KNN(x_train, y_train, x_test, y_test):
+def KNN(train_x, train_y, test_x, test_y):
 
     model = RandomForestClassifier(n_estimators=100, random_state=3)
 
-    model.fit(x_train, y_train)
+    model.fit(train_x, train_y)
 
-    print("Train  : ")
+    train_pred = model.predict(train_x)
+    test_pred = model.predict(test_x)
 
-    y_predict = model.predict(x_train)
+    train_acc = accuracy_score(train_y, train_pred)
+    test_acc = accuracy_score(test_y, test_pred)
 
-    score = accuracy_score(y_train, y_predict)
+    train_report = classification_report(train_y, train_pred)
+    test_report = classification_report(test_y, test_pred)
 
-    cr = classification_report(y_train, y_predict)
+    return train_acc, test_acc, train_report, test_report
+def KNNModel(train_x, train_y, x_test):
+    model = RandomForestClassifier(n_estimators=100, random_state=3)
+    model.fit(train_x, train_y)
+    test_pred = model.predict(x_test)
+    predictions = []
+    for i, prediction in enumerate(test_pred):
+        label = "Up" if prediction == 1 else "Down"
+        predictions.append(f"Signal {i + 1}: {label}")
+    return predictions
+def processAndTrain():
+    global train_acc, test_acc, train_report, test_report, predictions
 
-    cm = confusion_matrix(y_train, y_predict)
+    train_up = readfile("up&down/train_up.txt")
+    train_down = readfile("up&down/train_down.txt")
+    test_up = readfile("up&down/test_up.txt")
+    test_down = readfile("up&down/test_down.txt")
+    test_sample, test_sample_path = openFile()
 
-    print("Accuracy : ", score, "\n")
-    print("Classification Report : \n", cr)
-    print("Confusion Matrix : \n", cm)
+    if not (train_up and train_down and test_up and test_down and test_sample):
+        messagebox.showerror("Error", "Please provide all required files.")
+        return
 
-    print("Test  : ")
+    train_x = np.concatenate([preProcessing("up&down/train_up.txt"), preProcessing("up&down/train_down.txt")])
+    test_x = np.concatenate([preProcessing("up&down/test_up.txt"), preProcessing("up&down/test_down.txt")])
 
-    y_predict = model.predict(x_test)
+    train_y = np.concatenate([np.array([1]*len(train_up)), np.array([0]*len(train_down))])
+    test_y = np.concatenate([np.array([1]*len(test_up)), np.array([0]*len(test_down))])
 
-    score = accuracy_score(y_test, y_predict)
+    train_acc, test_acc, train_report, test_report = KNN(train_x, train_y, test_x, test_y)
 
-    cr = classification_report(y_test, y_predict)
+    x_test = preProcessing(test_sample_path)
 
-    cm = confusion_matrix(y_test, y_predict)
+    predictions = KNNModel(train_x, train_y, x_test,)
 
-    print("Accuracy : ", score, "\n")
-    print("Classification Report : \n", cr)
-    print("Confusion Matrix : \n", cm)
+def displaylabel():
+    result_text.set(f"Predicted Labels:\n" + "\n".join(predictions))
+
+def displayAccuracy():
+    result_text.set(f"Training Accuracy: {train_acc:.2f}\nTest Accuracy: {test_acc:.2f}")
+
+def displayReport():
+    result_text.set(f"Train Report:\n{train_report}\n\nTest Report:\n{test_report}")
+
+root = tk.Tk()
+root.title("Signal Processing and Classification")
+root.configure(bg="#f0f0f0")
 
 
+frame = tk.Frame(root, bg="#f0f0f0")
+frame.pack(padx=100, pady=10)
 
-samples_uptrain = preProcessing("up&down/train_up.txt")
 
-samples_uptest = preProcessing("up&down/test_up.txt")
+btn_process = tk.Button(frame, text="Process and train", command=processAndTrain, bg="#d3d3d3")
+btn_process.pack(pady=10)
 
-samples_downtrain = preProcessing("up&down/train_down.txt")
+btn_label = tk.Button(frame, text="Show up or down", command=displaylabel, bg="#d3d3d3")
+btn_label.pack(pady=10)
 
-samples_downtest = preProcessing("up&down/test_down.txt")
+btn_accuracy = tk.Button(frame, text="Show Accuracy", command=displayAccuracy, bg="#d3d3d3")
+btn_accuracy.pack(pady=10)
 
-train_x = np.concatenate([samples_uptrain, samples_downtrain])
-test_x = np.concatenate([samples_uptest, samples_downtest])
+btn_report = tk.Button(frame, text="Show Report", command=displayReport, bg="#d3d3d3")
+btn_report.pack(pady=10)
 
-train_y = np.concatenate([np.array([1]*len(samples_uptrain)), np.array([0]*len(samples_downtrain))])
-test_y = np.concatenate([np.array([1]*len(samples_uptest)), np.array([0]*len(samples_downtest))])
+result_text = tk.StringVar()
+result_label = tk.Label(frame, textvariable=result_text, justify="left", anchor="w", bg="#f0f0f0")
+result_label.pack(fill="both", padx=10, pady=10)
 
-KNN(train_x, train_y, test_x, test_y)
+root.mainloop()
+
