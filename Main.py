@@ -2,10 +2,15 @@ from tkinter import filedialog
 from scipy.signal import butter, filtfilt
 import numpy as np
 import pywt
+from sklearn import svm
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
 from sklearn.neighbors import KNeighborsClassifier
-def openFile():
-    filepath = filedialog.askopenfilename(title="Select File", filetypes=(("text files", ".txt"), ("all files", ".*")))
+from sklearn.svm import SVC
+from sklearn.tree import DecisionTreeClassifier
+def openFile(filepath):
+    # filepath = filedialog.askopenfilename(title="Select File", filetypes=(("text files", ".txt"), ("all files", ".*")))
     if filepath:
         samples = readfile(filepath)
 
@@ -50,33 +55,26 @@ def lowpass_filter(samples, highcut=20.0, fs=176, order=5):
     return filtered_signal
 
 def normalize_signal(samples):
-    normalized_samples = [] 
-
+    normalized_samples = []
     for sample_list in samples:
         min_val = np.min(sample_list)
         max_val = np.max(sample_list)
-
-        normalized_sample = 2 * (sample_list - min_val) / (max_val - min_val) - 1
+        normalized_sample = 2 * (np.array(sample_list) - min_val) / (max_val - min_val) - 1
         normalized_samples.append(list(normalized_sample))
-
     return normalized_samples
 
 
 def resampling(samples):
     m = 4
     resampled_samples = []
-    
     for sample_list in samples:
-
         filtered_samples = lowpass_filter(sample_list)
-
         resampled_signal = filtered_samples[::m]
         resampled_samples.append(resampled_signal)
-
     return resampled_samples
 
-def preProcessing():
-    samples = openFile()
+def preProcessing(filepath):
+    samples = openFile(filepath)
     samples = meanRemoval(samples)
     samples = bandpass_filter(samples)
     samples = normalize_signal(samples)
@@ -92,7 +90,7 @@ def wavelet(samples, wavelet = 'db2', level = 1):
 
 def KNN(x_train, y_train, x_test, y_test):
 
-    model = KNeighborsClassifier(n_neighbors=10)
+    model = KNeighborsClassifier(n_neighbors = 1)
 
     model.fit(x_train, y_train)
 
@@ -126,16 +124,16 @@ def KNN(x_train, y_train, x_test, y_test):
 
 
 
-samples_uptrain = preProcessing()
+samples_uptrain = preProcessing("up&down/train_up.txt")
 samples_uptrain = wavelet(samples_uptrain)
 
-samples_uptest = preProcessing()
+samples_uptest = preProcessing("up&down/test_up.txt")
 samples_uptest = wavelet(samples_uptest)
 
-samples_downtrain = preProcessing()
+samples_downtrain = preProcessing("up&down/train_down.txt")
 samples_downtrain = wavelet(samples_downtrain)
 
-samples_downtest = preProcessing()
+samples_downtest = preProcessing("up&down/test_down.txt")
 samples_downtest = wavelet(samples_downtest)
 
 train_x = np.concatenate([samples_uptrain, samples_downtrain])
