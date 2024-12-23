@@ -2,13 +2,10 @@ from tkinter import filedialog
 from scipy.signal import butter, filtfilt
 import numpy as np
 import pywt
-from sklearn import svm
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
 from sklearn.neighbors import KNeighborsClassifier
-from sklearn.svm import SVC
-from sklearn.tree import DecisionTreeClassifier
+
 def openFile(filepath):
     # filepath = filedialog.askopenfilename(title="Select File", filetypes=(("text files", ".txt"), ("all files", ".*")))
     if filepath:
@@ -79,6 +76,7 @@ def preProcessing(filepath):
     samples = bandpass_filter(samples)
     samples = normalize_signal(samples)
     samples = resampling(samples)
+    samples = wavelet(samples)
     return samples
 
 def wavelet(samples, wavelet = 'db2', level = 1):
@@ -90,7 +88,7 @@ def wavelet(samples, wavelet = 'db2', level = 1):
 
 def KNN(x_train, y_train, x_test, y_test):
 
-    model = KNeighborsClassifier(n_neighbors = 1)
+    model = RandomForestClassifier(n_estimators=100, random_state=3)
 
     model.fit(x_train, y_train)
 
@@ -125,16 +123,12 @@ def KNN(x_train, y_train, x_test, y_test):
 
 
 samples_uptrain = preProcessing("up&down/train_up.txt")
-samples_uptrain = wavelet(samples_uptrain)
 
 samples_uptest = preProcessing("up&down/test_up.txt")
-samples_uptest = wavelet(samples_uptest)
 
 samples_downtrain = preProcessing("up&down/train_down.txt")
-samples_downtrain = wavelet(samples_downtrain)
 
 samples_downtest = preProcessing("up&down/test_down.txt")
-samples_downtest = wavelet(samples_downtest)
 
 train_x = np.concatenate([samples_uptrain, samples_downtrain])
 test_x = np.concatenate([samples_uptest, samples_downtest])
